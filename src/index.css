@@ -1,0 +1,115 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ============================================================
+   1. ANIMATIONS (Nécessaires pour les Skeletons et le Home)
+   ============================================================ */
+
+/* Animation de balayage (Shimmer) pour les Skeletons */
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+/* Animation d'apparition douce (Fade In) */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Classes utilitaires d'animation */
+.animate-shimmer {
+  animation: shimmer 2s infinite linear;
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.8s ease-out forwards;
+}
+
+/* ============================================================
+   2. CONFIGURATION DE BASE ET VARIABLES
+   ============================================================ */
+:root {
+  /* Couleurs originales ajustées pour plus de contraste */
+  --text: #4b5563; /* Gris plus sombre pour la lisibilité */
+  --text-h: #000000; /* Noir pur pour les titres */
+  --bg: #ffffff;    /* Fond blanc pur pour un look minimaliste */
+  --border: #e5e7eb; /* Gris Tailwind pour les bordures */
+  --accent: #f97316; /* Orange Tailwind (orange-500) */
+  
+  /* Ombres plus subtiles et modernes */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+
+  /* Typographie */
+  --sans: 'Poppins', system-ui, -apple-system, sans-serif;
+  --mono: ui-monospace, Consolas, monospace;
+
+  font-size: 16px; /* Taille de base standard */
+  line-height: 1.5;
+  color: var(--text);
+  background-color: var(--bg);
+  
+  /* Amélioration du rendu du texte */
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Suppression des marges par défaut */
+body {
+  margin: 0;
+  padding: 0;
+  font-family: var(--sans);
+  min-height: 100vh;
+}
+
+/* ============================================================
+   3. MODE SOMBRE (DARK MODE) OPTIMISÉ
+   ============================================================ */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --text: #d1d5db;
+    --text-h: #f9fafb;
+    --bg: #000000;    /* Fond noir pur pour un contraste maximal */
+    --border: #1f2937;
+    --shadow-md: 0 4px 6px -1px rgba(255, 255, 255, 0.05); /* Ombre inversée */
+  }
+}
+
+/* ============================================================
+   4. STRUCTURE PRINCIPALE (#root)
+   ============================================================ */
+#root {
+  width: 100%;
+  /* Retrait de max-width pour que le contenu puisse prendre toute la largeur (Hero, etc.) */
+  margin: 0 auto;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+}
+
+/* ============================================================
+   5. STYLES TYPOGRAPHIQUES (HORS TAILWIND)
+   ============================================================ */
+
+/* On désactive les styles h1 par défaut pour laisser Tailwind gérer les titres spécifiques (comme LE SHOP ou ÉLEVEZ VOTRE STYLE) */
+/* h1 {
+  font-family: var(--sans);
+  font-weight: 700;
+  color: var(--text-h);
+  font-size: 48px;
+  letter-spacing: -1px;
+  margin: 40px 0;
+} */
+
+/* Utilitaires pour le code */
+code {
+  font-family: var(--mono);
+  font-size: 0.85em;
+  padding: 0.2em 0.4em;
+  background: var(--border);
+  border-radius: 4px;
+}

@@ -1,0 +1,9 @@
+[submodule "design-resources/anthropics-skills"]
+	path = design-resources/anthropics-skills
+	url = https://github.com/anthropics/skills
+[submodule "design-resources/claude-config"]
+	path = design-resources/claude-config
+	url = https://github.com/brianlovin/claude-config
+[submodule "design-resources/make-interfaces-feel-better"]
+	path = design-resources/make-interfaces-feel-better
+	url = https://github.com/jakubkrehel/make-interfaces-feel-better
