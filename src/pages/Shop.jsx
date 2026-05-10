@@ -1,10 +1,13 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import ProductCard from "../components/ProductCard";
 
 export default function Shop() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [searchParams] = useSearchParams();
+  const searchQuery = searchParams.get("search")?.toLowerCase() || "";
 
   useEffect(() => {
     fetchProducts();
@@ -67,15 +70,27 @@ export default function Shop() {
             <ShopSkeleton /> <ShopSkeleton /> <ShopSkeleton />
             <ShopSkeleton /> <ShopSkeleton /> <ShopSkeleton />
           </>
-        ) : products.length > 0 ? (
-          products.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))
-        ) : (
-          <div className="col-span-full py-16 text-center border border-dashed border-gray-100">
-            <p className="text-gray-300 font-black uppercase text-[10px] tracking-widest">Vide</p>
-          </div>
-        )}
+        ) : (() => {
+          const filteredProducts = products.filter((product) => {
+            const normalized = `${product.name || ""} ${product.category || ""} ${product.description || ""}`.toLowerCase();
+            return normalized.includes(searchQuery);
+          });
+
+          if (filteredProducts.length > 0) {
+            return filteredProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ));
+          }
+
+          return (
+            <div className="col-span-full py-16 text-center border border-dashed border-gray-100">
+              <p className="text-gray-500 font-black uppercase text-[11px] tracking-widest mb-3">Aucun produit trouvé.</p>
+              {searchQuery && (
+                <p className="text-[10px] text-gray-400 uppercase tracking-[0.35em]">Essayez une autre recherche.</p>
+              )}
+            </div>
+          );
+        })()}
       </div>
     </div>
   );

@@ -1,24 +1,75 @@
 import { useState } from "react";
-import { supabase } from "../services/supabaseClient";
+import { supabase, STORAGE_BUCKET } from "../services/supabaseClient";
 import { useNavigate } from "react-router-dom";
 
 export default function AddProduct() {
-  const [form, setForm] = useState({ 
-    name: "", 
-    price: "", 
-    stock: "", 
-    description: "", 
+  const [form, setForm] = useState({
+    name: "",
+    price: "",
+    stock: "",
+    description: "",
     category: "",
-    image_url: "" // Ajout de l'état pour l'image
+    image_url: ""
   });
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
+
+  // Fonction pour uploader l'image vers Supabase Storage
+  const uploadImage = async (file) => {
+    if (!file) return null;
+
+    setUploading(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}.${fileExt}`;
+    const filePath = `products/${fileName}`;
+
+    const { error } = await supabase.storage
+      .from(STORAGE_BUCKET)
+      .upload(filePath, file);
+
+    if (error) {
+      console.error(`Erreur upload bucket=${STORAGE_BUCKET}:`, error);
+      alert(`Erreur lors de l'upload de l'image vers le bucket "${STORAGE_BUCKET}" : ${error.message || JSON.stringify(error)}`);
+      setUploading(false);
+      return null;
+    }
+
+    setUploading(false);
+    return filePath;
+  };
+
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      // Vérifier le type de fichier
+      if (!file.type.startsWith('image/')) {
+        alert('Veuillez sélectionner une image valide');
+        return;
+      }
+      // Vérifier la taille (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('L\'image ne doit pas dépasser 5MB');
+        return;
+      }
+      setSelectedFile(file);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+
     if (parseFloat(form.price) < 0 || parseInt(form.stock) < 0) {
       alert("Erreur : Le prix et le stock doivent être positifs.");
       return;
+    }
+
+    let imageUrl = form.image_url;
+
+    // Si un fichier est sélectionné, l'uploader
+    if (selectedFile) {
+      imageUrl = await uploadImage(selectedFile);
+      if (!imageUrl) return; // Erreur d'upload
     }
 
     const { data: { user } } = await supabase.auth.getUser();
@@ -26,11 +77,12 @@ export default function AddProduct() {
     const { error } = await supabase
       .from("products")
       .insert([
-        { 
-          ...form, 
+        {
+          ...form,
+          image_url: imageUrl,
           price: parseFloat(form.price),
           stock: parseInt(form.stock),
-          seller_id: user.id 
+          seller_id: user.id
         }
       ]);
 
@@ -58,16 +110,30 @@ export default function AddProduct() {
           />
         </div>
 
-        {/* LIEN DE L'IMAGE (NOUVEAU) */}
+        {/* UPLOAD D'IMAGE */}
         <div>
-          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">URL de l'image (Lien direct)</label>
-          <input 
-            type="url"
-            placeholder="https://exemple.com/image.jpg"
-            className="w-full border-b border-gray-200 p-3 outline-none focus:border-black text-xs font-bold"
-            onChange={(e) => setForm({...form, image_url: e.target.value})}
-            required
-          />
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Image du produit</label>
+          <div className="mt-2">
+            <input
+              type="file"
+              accept="image/*"
+              onChange={handleFileChange}
+              className="w-full border-b border-gray-200 p-3 outline-none focus:border-black text-xs font-bold file:mr-4 file:py-2 file:px-4 file:border-0 file:text-xs file:font-bold file:bg-gray-100 file:text-gray-700 hover:file:bg-gray-200"
+            />
+            {selectedFile && (
+              <div className="mt-3">
+                <p className="text-xs text-gray-600 mb-2">Aperçu :</p>
+                <img
+                  src={URL.createObjectURL(selectedFile)}
+                  alt="Aperçu"
+                  className="w-32 h-32 object-cover border border-gray-200 rounded"
+                />
+              </div>
+            )}
+            {uploading && (
+              <p className="text-xs text-orange-600 mt-2">Upload en cours...</p>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-8">
@@ -108,6 +174,7 @@ export default function AddProduct() {
             <option value="Chaussures">Chaussures</option>
             <option value="Vestes">Vestes</option>
             <option value="Accessoires">Accessoires</option>
+            <option value="electronic">Électronique</option>
           </select>
         </div>
 

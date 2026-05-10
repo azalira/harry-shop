@@ -1,23 +1,77 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Link } from 'react-router-dom';
+import StorageImage from '../components/StorageImage';
 
 export default function SellerDashboard() {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
 
+  // 1. Définition de la fonction de récupération des données
+  const fetchSellerData = async () => {
+    try {
+      setLoading(true);
+      // Récupérer l'ID de l'utilisateur connecté
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        alert("Veuillez vous connecter");
+        return;
+      }
+
+      // On récupère uniquement les produits de ce vendeur
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("seller_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+      setProducts(data || []);
+    } catch (error) {
+      console.error("Erreur fetch:", error.message);
+      alert("Impossible de charger les produits");
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     fetchSellerData();
   }, []);
 
-  async function fetchSellerData() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const { data } = await supabase.from('products').select('*').eq('seller_id', user.id).order('created_at', { ascending: false });
-      setProducts(data || []);
+  const handleDelete = async (productId) => {
+    const confirmDelete = window.confirm("Es-tu sûr de vouloir supprimer cet article ?");
+
+    if (!confirmDelete) return;
+
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .select("id", { count: "exact" })
+      .eq("product_id", productId)
+      .limit(1);
+
+    if (orderError) {
+      alert("Erreur de vérification des commandes : " + orderError.message);
+      return;
     }
-    setTimeout(() => setLoading(false), 800);
-  }
+
+    if (orderData?.length > 0) {
+      alert("Impossible de supprimer ce produit : il est déjà associé à une commande.");
+      return;
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", productId);
+
+    if (error) {
+      alert("Erreur lors de la suppression : " + error.message);
+    } else {
+      // Mise à jour locale sans rechargement
+      setProducts(products.filter((p) => p.id !== productId));
+    }
+  };
 
   const SkeletonCard = () => (
     <div className="relative overflow-hidden flex items-center justify-between p-6 border border-gray-100 bg-white">
@@ -44,21 +98,42 @@ export default function SellerDashboard() {
       <div className="mt-12 space-y-4">
         {loading ? (
           <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
-        ) : products.map((product) => (
-          <div key={product.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:shadow-md transition-all">
-            <div className="flex items-center gap-6">
-              <img src={product.image_url} alt="" className="w-20 h-20 object-cover bg-gray-50" />
-              <div>
-                <h4 className="font-bold text-lg uppercase">{product.name}</h4>
-                <p className="text-orange-500 font-black text-xl">{product.price}€</p>
+        ) : products.length > 0 ? (
+          products.map((product) => (
+            <div key={product.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:shadow-md transition-all">
+              <div className="flex items-center gap-6">
+                <StorageImage
+                  src={product.image_url}
+                  alt={product.name}
+                  className="w-20 h-20 object-cover bg-gray-50"
+                  fallback="https://via.placeholder.com/80"
+                />
+                <div>
+                  <h4 className="font-bold text-lg uppercase">{product.name}</h4>
+                  <p className="text-orange-500 font-black text-xl">{product.price}€</p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <Link 
+                  to={`/edit-product/${product.id}`} 
+                  className="text-[11px] font-bold uppercase text-gray-400 hover:text-black transition"
+                >
+                  Modifier
+                </Link>
+                <button
+                  onClick={() => handleDelete(product.id)}
+                  className="text-[11px] font-bold uppercase text-red-300 hover:text-red-600 transition"
+                >
+                  Supprimer
+                </button>
               </div>
             </div>
-            <div className="flex gap-6">
-              <Link to={`/edit-product/${product.id}`} className="text-[11px] font-bold uppercase text-gray-400 hover:text-black transition">Modifier</Link>
-              <button className="text-[11px] font-bold uppercase text-red-300 hover:text-red-600 transition">Supprimer</button>
-            </div>
+          ))
+        ) : (
+          <div className="text-center py-20 border-2 border-dashed border-gray-100 text-gray-400 uppercase text-xs font-bold tracking-widest">
+            Aucun produit trouvé
           </div>
-        ))}
+        )}
       </div>
     </div>
   );

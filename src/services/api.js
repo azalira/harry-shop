@@ -16,6 +16,7 @@ export async function getProducts() {
         id,
         name,
         price,
+        stock,
         image_url,
         description,
         created_at,

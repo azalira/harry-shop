@@ -1,135 +1,242 @@
 import { useEffect, useState } from "react";
-import { supabase } from "../services/supabaseClient";
-import { Link, useNavigate } from "react-router-dom";
+import { supabase, STORAGE_BUCKET } from "../services/supabaseClient";
+import { useNavigate, useParams } from "react-router-dom";
+import useStorageImageUrl from "../hooks/useStorageImageUrl";
 
-export default function SellerDashboard() {
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState(null);
+export default function EditProduct() {
+  const { id } = useParams();
   const navigate = useNavigate();
+  
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  
+  const [form, setForm] = useState({
+    name: "",
+    price: "",
+    stock: "",
+    description: "",
+    category: "",
+  });
+
+  const [currentImageValue, setCurrentImageValue] = useState("");
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [previewUrl, setPreviewUrl] = useState(null);
+  const currentImageUrl = useStorageImageUrl(currentImageValue);
 
   useEffect(() => {
-    checkUser();
-  }, []);
+    fetchProduct();
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [id]);
 
-  // 1. Vérifier si l'utilisateur est connecté
-  async function checkUser() {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      navigate("/login");
-    } else {
-      setUser(user);
-      fetchUserProducts(user.id);
-    }
-  }
-
-  // 2. Récupérer uniquement les produits du vendeur connecté
-  async function fetchUserProducts(userId) {
+  async function fetchProduct() {
     const { data, error } = await supabase
       .from("products")
       .select("*")
-      .eq("seller_id", userId)
-      .order("created_at", { ascending: false });
+      .eq("id", id)
+      .single();
 
     if (error) {
-      console.error("Erreur:", error.message);
-    } else {
-      setProducts(data);
+      console.error("Erreur fetch:", error);
+      navigate("/dashboard");
+      return;
     }
+
+    setForm({
+      name: data.name || "",
+      price: data.price || "",
+      stock: data.stock || "",
+      description: data.description || "",
+      category: data.category || "",
+    });
+    setCurrentImageValue(data.image_url || "");
     setLoading(false);
   }
 
-  // 3. Fonction de suppression
-  const handleDelete = async (productId) => {
-    const confirmDelete = window.confirm("Es-tu sûr de vouloir supprimer cet article ?");
-    
-    if (confirmDelete) {
-      const { error } = await supabase
-        .from("products")
-        .delete()
-        .eq("id", productId);
+  const uploadImage = async (file) => {
+    try {
+      setUploading(true);
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Date.now()}.${fileExt}`;
+      const filePath = `products/${fileName}`;
 
-      if (error) {
-        alert("Erreur lors de la suppression : " + error.message);
-      } else {
-        // Mise à jour locale de la liste pour éviter de recharger la page
-        setProducts(products.filter((p) => p.id !== productId));
-      }
+      // 1. Upload du fichier
+      const { error: uploadError } = await supabase.storage
+        .from(STORAGE_BUCKET)
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      return filePath;
+
+    } catch (error) {
+      alert("Erreur upload: " + error.message);
+      return null;
+    } finally {
+      setUploading(false);
     }
   };
 
-  if (loading) return (
-    <div className="flex justify-center items-center h-screen font-black uppercase tracking-widest">
-      Chargement du dashboard...
-    </div>
-  );
+  const handleFileChange = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Image trop lourde (max 5Mo)");
+        return;
+      }
+      setSelectedFile(file);
+      setPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+
+    let finalImageUrl = currentImageValue;
+
+    // Si l'utilisateur a choisi un nouveau fichier
+    if (selectedFile) {
+      const uploadedUrl = await uploadImage(selectedFile);
+      if (uploadedUrl) finalImageUrl = uploadedUrl;
+    }
+
+    const { error } = await supabase
+      .from("products")
+      .update({
+        name: form.name,
+        price: parseFloat(form.price),
+        stock: parseInt(form.stock),
+        description: form.description,
+        category: form.category,
+        image_url: finalImageUrl,
+      })
+      .eq("id", id);
+
+    if (!error) {
+      alert("Produit mis à jour avec succès !");
+      navigate("/dashboard");
+    } else {
+      alert("Erreur update: " + error.message);
+      setSaving(false);
+    }
+  };
+
+  if (loading) return <div className="flex justify-center items-center h-screen font-black uppercase tracking-widest">Chargement...</div>;
 
   return (
-    <div className="max-w-[900px] mx-auto px-6 py-16">
-      {/* HEADER DASHBOARD */}
-      <div className="flex justify-between items-center mb-12 border-b pb-8">
+    <div className="max-w-[600px] mx-auto mt-20 p-10 bg-white border border-gray-100 shadow-sm">
+      <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Modifier le produit</h2>
+
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* NOM */}
         <div>
-          <h1 className="text-3xl font-black uppercase tracking-tighter">Tableau de bord</h1>
-          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-widest mt-2">
-            Connecté en tant que : {user?.email}
-          </p>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Nom de l'article</label>
+          <input
+            type="text"
+            value={form.name}
+            className="w-full border-b border-gray-200 p-3 outline-none focus:border-black uppercase text-xs font-bold"
+            onChange={(e) => setForm({...form, name: e.target.value})}
+            required
+          />
         </div>
-        <Link 
-          to="/add-product" 
-          className="bg-black text-white px-6 py-3 text-[10px] font-black uppercase tracking-widest hover:bg-orange-600 transition-all shadow-lg"
-        >
-          Ajouter un article
-        </Link>
-      </div>
 
-      {/* LISTE DES PRODUITS */}
-      <div className="space-y-6">
-        {products.length > 0 ? (
-          products.map((product) => (
-            <div key={product.id} className="flex items-center justify-between bg-white border border-gray-100 p-6 shadow-sm hover:shadow-md transition-shadow">
-              
-              <div className="flex items-center gap-6">
-                {/* APERÇU IMAGE */}
-                <div className="w-20 h-20 bg-gray-50 border border-gray-100 overflow-hidden">
-                  <img 
-                    src={product.image_url} 
-                    alt={product.name} 
-                    className="w-full h-full object-cover"
-                    onError={(e) => { e.target.src = "https://via.placeholder.com/150"; }}
-                  />
-                </div>
-
-                {/* INFOS TEXTE */}
-                <div>
-                  <h3 className="font-black uppercase text-sm tracking-tight">{product.name}</h3>
-                  <p className="text-orange-500 font-black text-lg">{product.price}€</p>
-                  <p className="text-[9px] font-bold text-gray-300 uppercase tracking-widest">Stock: {product.stock}</p>
-                </div>
-              </div>
-
-              {/* ACTIONS */}
-              <div className="flex gap-6 items-center">
-                <Link 
-                  to={`/edit-product/${product.id}`} 
-                  className="text-[10px] font-bold text-gray-400 hover:text-black transition-colors uppercase tracking-widest border-b border-transparent hover:border-black pb-1"
-                >
-                  Modifier
-                </Link>
-                <button 
-                  onClick={() => handleDelete(product.id)}
-                  className="text-[10px] font-bold text-red-300 hover:text-red-600 transition-colors uppercase tracking-widest border-b border-transparent hover:border-red-600 pb-1"
-                >
-                  Supprimer
-                </button>
-              </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-20 border-2 border-dashed border-gray-100">
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest">Aucun produit en vente pour le moment.</p>
+        {/* SECTION IMAGE */}
+        <div className="flex gap-6 items-center p-4 bg-gray-50 border border-dashed border-gray-200">
+          <div className="w-24 h-24 bg-white border border-gray-100 flex-shrink-0">
+            <img 
+              src={previewUrl || currentImageUrl || 'https://via.placeholder.com/150'} 
+              alt="Aperçu" 
+              className="w-full h-full object-cover"
+              onError={(e) => e.target.src = 'https://via.placeholder.com/150'}
+            />
           </div>
-        )}
-      </div>
+          <div className="flex-1">
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest block mb-2">Changer l'image</label>
+            <input 
+              type="file" 
+              accept="image/*" 
+              onChange={handleFileChange} 
+              className="text-[10px] w-full"
+            />
+            {uploading && <p className="text-orange-500 text-[9px] font-bold mt-2 uppercase">Upload en cours...</p>}
+          </div>
+        </div>
+
+        {/* PRIX & STOCK */}
+        <div className="grid grid-cols-2 gap-8">
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Prix (€)</label>
+            <input
+              type="number"
+              step="0.01"
+              value={form.price}
+              className="w-full border-b border-gray-200 p-3 outline-none focus:border-black font-black text-lg"
+              onChange={(e) => setForm({...form, price: e.target.value})}
+              required
+            />
+          </div>
+          <div>
+            <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Stock</label>
+            <input
+              type="number"
+              value={form.stock}
+              className="w-full border-b border-gray-200 p-3 outline-none focus:border-black font-black text-lg"
+              onChange={(e) => setForm({...form, stock: e.target.value})}
+              required
+            />
+          </div>
+        </div>
+
+        {/* CATEGORIE */}
+        <div>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Catégorie</label>
+          <select
+            value={form.category}
+            className="w-full border-b border-gray-200 p-3 outline-none focus:border-black text-xs font-bold uppercase"
+            onChange={(e) => setForm({...form, category: e.target.value})}
+            required
+          >
+            <option value="">Sélectionner</option>
+            <option value="T-shirts">T-shirts</option>
+            <option value="Pantalons">Pantalons</option>
+            <option value="Chaussures">Chaussures</option>
+            <option value="Vestes">Vestes</option>
+            <option value="Accessoires">Accessoires</option>
+          </select>
+        </div>
+
+        {/* DESCRIPTION */}
+        <div>
+          <label className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Description</label>
+          <textarea
+            value={form.description}
+            className="w-full border border-gray-100 p-4 outline-none focus:border-black h-32 text-xs font-bold"
+            onChange={(e) => setForm({...form, description: e.target.value})}
+            required
+          />
+        </div>
+
+        {/* BOUTONS */}
+        <div className="flex gap-4">
+          <button
+            type="submit"
+            disabled={saving || uploading}
+            className="flex-1 bg-black text-white py-5 font-black text-[11px] tracking-[0.3em] uppercase hover:bg-orange-600 transition-all disabled:opacity-50"
+          >
+            {saving ? "Sauvegarde..." : "Enregistrer"}
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate("/dashboard")}
+            className="flex-1 bg-gray-100 text-gray-500 py-5 font-black text-[11px] tracking-[0.3em] uppercase hover:bg-gray-200 transition-all"
+          >
+            Annuler
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

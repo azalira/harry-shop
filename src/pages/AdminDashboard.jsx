@@ -48,8 +48,28 @@ export default function AdminDashboard() {
 
   async function deleteProduct(id) {
     const confirm = window.confirm("Supprimer définitivement ce produit ?");
-    if (confirm) {
-      await supabase.from("products").delete().eq("id", id);
+    if (!confirm) return;
+
+    const { data: orderData, error: orderError } = await supabase
+      .from("orders")
+      .select("id", { count: "exact" })
+      .eq("product_id", id)
+      .limit(1);
+
+    if (orderError) {
+      alert("Erreur de vérification des commandes : " + orderError.message);
+      return;
+    }
+
+    if (orderData?.length > 0) {
+      alert("Impossible de supprimer ce produit : il est déjà associé à une commande.");
+      return;
+    }
+
+    const { error } = await supabase.from("products").delete().eq("id", id);
+    if (error) {
+      alert("Erreur lors de la suppression : " + error.message);
+    } else {
       fetchDashboardData();
     }
   }

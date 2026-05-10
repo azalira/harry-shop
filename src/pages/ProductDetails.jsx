@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useCart } from "../context/CartContext";
+import StorageImage from "../components/StorageImage";
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -12,6 +13,9 @@ export default function ProductDetails() {
   const [loading, setLoading] = useState(true);
   const [quantity, setQuantity] = useState(1);
   const [isBuying, setIsBuying] = useState(false);
+
+  const stockCount = Number(product?.stock) || 0;
+  const isInStock = stockCount > 0;
 
   useEffect(() => {
     // Sécurité : Si l'ID dans l'URL est corrompu ou "undefined"
@@ -44,6 +48,11 @@ export default function ProductDetails() {
   }
 
   const handleBuyNow = async () => {
+    if (!isInStock) {
+      alert("Ce produit est en rupture de stock.");
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return navigate("/login");
 
@@ -72,18 +81,26 @@ export default function ProductDetails() {
 
       if (error) throw error;
 
-      navigate("/payment", { 
-        state: { 
-          orderId: newOrder.id, 
+      navigate("/payment", {
+        state: {
+          orderId: newOrder.id,
           totalPrice: product.price * quantity,
-          product: product 
-        } 
+          product: product
+        }
       });
     } catch (err) {
       alert("Erreur commande : " + err.message);
     } finally {
       setIsBuying(false);
     }
+  };
+
+  const handleAddToCart = () => {
+    if (!isInStock) {
+      alert("Ce produit est en rupture de stock.");
+      return;
+    }
+    addToCart(product, quantity);
   };
 
   // --- GESTION DES ÉTATS D'AFFICHAGE (EMPECHE LE CRASH) ---
@@ -117,10 +134,10 @@ export default function ProductDetails() {
         
         {/* IMAGE */}
         <div className="bg-white aspect-square border border-gray-100 shadow-sm overflow-hidden">
-          <img 
-            src={product.image_url} 
-            alt={product.name} 
-            className="w-full h-full object-cover" 
+          <StorageImage
+            src={product.image_url}
+            alt={product.name}
+            className="w-full h-full object-cover"
           />
         </div>
 
@@ -138,20 +155,30 @@ export default function ProductDetails() {
           <p className="text-4xl font-black italic">{product.price}€</p>
           
           <div className="flex flex-col gap-4 pt-6">
+            <div className="flex items-center justify-between">
+              <p className="text-sm uppercase tracking-widest text-gray-500">Stock disponible</p>
+              <p className={`text-sm font-black uppercase ${isInStock ? 'text-emerald-600' : 'text-red-600'}`}>
+                {isInStock ? `${stockCount} articles` : 'Rupture de stock'}
+              </p>
+            </div>
+
             <button 
-              onClick={() => addToCart(product, quantity)} 
-              className="w-full py-5 border-2 border-black font-black uppercase text-[11px] tracking-widest hover:bg-black hover:text-white transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+              onClick={handleAddToCart} 
+              disabled={!isInStock}
+              className={`w-full py-5 border-2 border-black font-black uppercase text-[11px] tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] ${
+                !isInStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-black hover:text-white'
+              }`}
             >
               Ajouter au panier
             </button>
             <button 
               onClick={handleBuyNow}
-              disabled={isBuying}
+              disabled={isBuying || !isInStock}
               className={`w-full py-5 bg-black text-white font-black uppercase text-[11px] tracking-widest transition-all shadow-[4px_4px_0px_0px_rgba(255,100,0,1)] ${
-                isBuying ? "opacity-50" : "hover:bg-orange-600"
+                isBuying || !isInStock ? 'opacity-50 cursor-not-allowed' : 'hover:bg-orange-600'
               }`}
             >
-              {isBuying ? "Traitement..." : "Acheter maintenant"}
+              {isBuying ? "Traitement..." : isInStock ? "Acheter maintenant" : "Produit en rupture"}
             </button>
           </div>
         </div>

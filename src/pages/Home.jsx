@@ -56,7 +56,7 @@ export default function Home() {
   );
 
   return (
-    <main className="flex-1 bg-white">
+    <main className="flex-1 bg-white font-smoothing-antialiased">
       {/* SECTION HERO AVEC IMAGE DE FOND - NOUVEAU DESIGN */}
       <section 
         className="relative w-full h-[85vh] flex items-center justify-center overflow-hidden bg-cover bg-center"
@@ -70,13 +70,13 @@ export default function Home() {
           <span className="text-orange-500 font-black tracking-[0.4em] text-[11px] uppercase mb-6 animate-fade-in-up">
             HARRY.SHOP : LE COLLECTIF DE STYLE.
           </span>
-          <h2 className="text-5xl md:text-6xl font-black uppercase tracking-[-0.03em] italic text-white leading-[1.1] mb-10 max-w-4xl animate-fade-in-up delay-100">
+          <h2 className="text-5xl md:text-6xl font-black uppercase italic text-white leading-[1.1] mb-10 max-w-4xl animate-fade-in-up delay-100 text-balance">
             Élevez Votre <br className="hidden md:block"/> Style Quotidien
           </h2>
           <p className="text-sm text-gray-200 mb-14 max-w-xl animate-fade-in-up delay-200">
             Découvrez une sélection exclusive de streetwear conçu pour marquer les esprits.
           </p>
-          <Link to="/shop" className="bg-white text-black px-12 py-5 font-black uppercase text-[11px] tracking-[0.2em] hover:bg-orange-500 hover:text-white transition-all shadow-2xl rounded-sm animate-fade-in-up delay-300">
+          <Link to="/shop" className="bg-white text-black px-12 py-5 font-black uppercase text-[11px] tracking-[0.2em] hover:bg-orange-500 hover:text-white transition-all shadow-2xl rounded-lg animate-fade-in-up delay-300">
             Découvrir le shop
           </Link>
         </div>
@@ -88,7 +88,7 @@ export default function Home() {
         <div className="flex justify-between items-end mb-16 border-b pb-8 border-gray-100">
           <div className="text-left">
             <p className="text-[10px] font-black uppercase tracking-widest text-gray-400 mb-2">Notre sélection</p>
-            <h2 className="text-5xl font-black uppercase italic tracking-tighter text-black">Nos Produits Phares</h2>
+            <h2 className="text-5xl font-black uppercase italic tracking-tighter text-black text-balance">Nos Produits Phares</h2>
           </div>
           <Link to="/shop" className="text-[11px] font-black border-b-2 border-black pb-1 uppercase tracking-widest text-black hover:text-orange-500 hover:border-orange-500 transition-colors">
             Tout voir
@@ -109,7 +109,7 @@ export default function Home() {
             ))
           ) : (
             // Message si aucun produit n'est trouvé
-            <div className="col-span-full text-center py-32 border border-dashed border-gray-100 rounded-sm bg-gray-50">
+            <div className="col-span-full text-center py-32 border border-dashed border-gray-100 rounded-lg bg-gray-50 shadow-sm">
               <p className="text-gray-300 font-black uppercase text-xs tracking-widest">
                 Aucun produit phare disponible pour le moment.
               </p>

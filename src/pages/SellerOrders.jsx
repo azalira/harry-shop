@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import StorageImage from "../components/StorageImage";
 
 export default function SellerOrders() {
   const [orders, setOrders] = useState([]);
@@ -77,10 +78,11 @@ export default function SellerOrders() {
                   <td className="py-6">
                     <div className="flex items-center gap-4">
                       <div className="w-12 h-12 bg-gray-50 border border-gray-100 overflow-hidden">
-                        <img 
-                          src={order.products?.image_url || "https://via.placeholder.com/100"} 
-                          alt="" 
-                          className="w-full h-full object-cover" 
+                        <StorageImage
+                          src={order.products?.image_url}
+                          alt={order.products?.name || "Produit"}
+                          className="w-full h-full object-cover"
+                          fallback="https://via.placeholder.com/100"
                         />
                       </div>
                       <span className="font-black uppercase text-xs tracking-tight">
