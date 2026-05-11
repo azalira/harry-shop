@@ -12,6 +12,42 @@ export default function MyOrders() {
     fetchOrders();
   }, []);
 
+  async function cancelOrder(orderId, productId, quantity) {
+    if (!confirm("Voulez-vous vraiment annuler cette commande ?")) return;
+
+    try {
+      const { data: product, error: productError } = await supabase
+        .from("products")
+        .select("stock")
+        .eq("id", productId)
+        .single();
+
+      if (productError) throw productError;
+
+      const { error: updateError } = await supabase
+        .from("orders")
+        .update({ status: "annulé" })
+        .eq("id", orderId);
+
+      if (updateError) throw updateError;
+
+      const { error: stockError } = await supabase
+        .from("products")
+        .update({ stock: product.stock + quantity })
+        .eq("id", productId);
+
+      if (stockError) throw stockError;
+
+      setOrders((prev) =>
+        prev.map((o) =>
+          o.id === orderId ? { ...o, status: "annulé" } : o
+        )
+      );
+    } catch (err) {
+      alert("Erreur lors de l'annulation : " + err.message);
+    }
+  }
+
   async function fetchOrders() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -104,6 +140,14 @@ export default function MyOrders() {
                     <span className="px-3 py-1 bg-black text-white text-[9px] font-black uppercase tracking-widest">
                       {order.status}
                     </span>
+                    {(order.status === "en attente" || order.status === "payé") && (
+                      <button
+                        onClick={() => cancelOrder(order.id, order.product_id, order.quantity)}
+                        className="ml-2 px-3 py-1 bg-red-600 text-white text-[9px] font-black uppercase tracking-widest hover:bg-red-700 transition-colors"
+                      >
+                        Annuler
+                      </button>
+                    )}
                   </td>
                 </tr>
               ))

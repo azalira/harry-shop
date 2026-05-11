@@ -67,6 +67,10 @@ export async function getProductById(productId) {
 // ============================================================
 
 export const signUpUser = async (email, password, role, username) => {
+  if (role === 'admin') {
+    throw new Error("La création d'un compte administrateur n'est pas autorisée.");
+  }
+
   try {
     const { data, error } = await supabase.auth.signUp({
       email,
