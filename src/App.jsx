@@ -14,6 +14,7 @@ import Payment from "./pages/Payment";
 import ProductCard from "./components/ProductCard";
 import AdminDashboard from "./pages/AdminDashboard";
 import Notifications from "./pages/Notifications";
+import MyOrders from "./pages/MyOrders";
 function App() {
   return (
     <BrowserRouter>
@@ -32,6 +33,7 @@ function App() {
         <Route path="/payment" element={<Payment />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/notifications" element={<Notifications />} />
+        <Route path="/my-orders" element={<MyOrders />} />
       </Routes>
     </BrowserRouter>
   );
