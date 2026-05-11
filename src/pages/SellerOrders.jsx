@@ -66,6 +66,7 @@ export default function SellerOrders() {
             <tr className="border-b border-gray-100 text-left">
               <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Article</th>
               <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Acheteur</th>
+              <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Livraison</th>
               <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Date</th>
               <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Total</th>
               <th className="py-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Statut</th>
@@ -95,6 +96,11 @@ export default function SellerOrders() {
                       @{order.profiles?.username || "Client Anonyme"}
                     </span>
                   </td>
+                  <td className="py-6">
+                    <span className="text-[10px] font-bold text-gray-600 max-w-[160px] inline-block leading-relaxed" title={order.delivery_address}>
+                      {order.delivery_address || "—"}
+                    </span>
+                  </td>
                   <td className="py-6 text-[10px] font-bold text-gray-400 uppercase tracking-tighter">
                     {new Date(order.created_at).toLocaleDateString('fr-FR')}
                   </td>
@@ -110,7 +116,7 @@ export default function SellerOrders() {
               ))
             ) : (
               <tr>
-                <td colSpan="5" className="py-24 text-center">
+                <td colSpan="6" className="py-24 text-center">
                   <p className="text-gray-300 text-[10px] font-black uppercase tracking-[0.3em]">
                     Aucune vente enregistrée dans votre historique
                   </p>

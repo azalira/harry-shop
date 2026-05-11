@@ -9,29 +9,75 @@ export default function Payment() {
   const navigate = useNavigate();
   const { clearCart } = useCart();
   
-  // 1. On récupère les données du state avec une sécurité (objet vide par défaut)
   const { orderId, totalPrice, product, cartItems } = location.state || {};
 
   const [loading, setLoading] = useState(false);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardErrors, setCardErrors] = useState({});
+  const [delivery, setDelivery] = useState({
+    address: "",
+    city: "",
+    zip: "",
+    country: "France"
+  });
 
   useEffect(() => {
     if (!orderId && (!Array.isArray(cartItems) || cartItems.length === 0)) {
-      console.error("Erreur : orderId et cartItems sont manquants. Redirection...");
-      // Optionnel : décommente la ligne suivante pour rediriger automatiquement
-      // navigate("/shop");
+      console.error("Erreur : orderId et cartItems sont manquants.");
     }
   }, [orderId, cartItems, navigate]);
 
+  const formatCardNumber = (value) => {
+    const digits = value.replace(/\D/g, "").slice(0, 16);
+    return digits.replace(/(\d{4})(?=\d)/g, "$1 ");
+  };
+
+  const handleCardChange = (e) => {
+    const formatted = formatCardNumber(e.target.value);
+    setCardNumber(formatted);
+    if (cardErrors.card) setCardErrors((prev) => ({ ...prev, card: "" }));
+  };
+
+  const validate = () => {
+    const errors = {};
+    const rawCard = cardNumber.replace(/\s/g, "");
+
+    if (rawCard.length < 16) {
+      errors.card = "Le numéro de carte doit contenir 16 chiffres.";
+    }
+    if (!delivery.address.trim()) {
+      errors.address = "L'adresse de livraison est requise.";
+    }
+    if (!delivery.city.trim()) {
+      errors.city = "La ville est requise.";
+    }
+    if (!delivery.zip.trim()) {
+      errors.zip = "Le code postal est requis.";
+    }
+
+    setCardErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
   const handleConfirmPayment = async () => {
+    if (!validate()) return;
+
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Veuillez vous connecter pour finaliser le paiement.");
 
+      const lastFour = cardNumber.replace(/\s/g, "").slice(-4);
+      const deliveryInfo = `${delivery.address}, ${delivery.zip} ${delivery.city}, ${delivery.country}`;
+
       if (orderId) {
         const { error } = await supabase
           .from("orders")
-          .update({ status: "payé" })
+          .update({
+            status: "payé",
+            card_last_four: lastFour,
+            delivery_address: deliveryInfo
+          })
           .eq("id", orderId);
 
         if (error) throw error;
@@ -42,7 +88,9 @@ export default function Payment() {
           seller_id: item.seller_id || item.user_id || item.profiles?.id || null,
           quantity: item.quantity,
           total_price: Number(item.price) * Number(item.quantity),
-          status: "payé"
+          status: "payé",
+          card_last_four: lastFour,
+          delivery_address: deliveryInfo
         }));
 
         const { error } = await supabase.from("orders").insert(ordersToInsert);
@@ -64,7 +112,6 @@ export default function Payment() {
   const isCartCheckout = Array.isArray(cartItems) && cartItems.length > 0;
   const displayOrderId = orderId ? `${orderId.slice(0, 18)}...` : "PANIER";
 
-  // 3. AFFICHAGE DE SÉCURITÉ : Si les données sont corrompues
   if (!orderId && !isCartCheckout) {
     return (
       <div className="max-w-[800px] mx-auto p-20 text-center">
@@ -125,10 +172,122 @@ export default function Payment() {
           </div>
         )}
 
+        {/* CARTE BANCAIRE */}
+        <div className="border-t-2 border-gray-100 pt-8 mt-8 text-left">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+            Carte Bancaire
+          </p>
+          <div>
+            <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+              Numéro de carte
+            </label>
+            <input
+              type="text"
+              inputMode="numeric"
+              placeholder="1234 5678 9012 3456"
+              value={cardNumber}
+              onChange={handleCardChange}
+              maxLength={19}
+              className={`w-full border-2 px-4 py-3 text-sm font-mono tracking-widest outline-none transition-colors ${
+                cardErrors.card ? "border-red-500 bg-red-50" : "border-black focus:bg-gray-100"
+              }`}
+            />
+            {cardErrors.card && (
+              <p className="text-red-500 text-[10px] font-bold mt-1">{cardErrors.card}</p>
+            )}
+            <p className="text-[9px] text-gray-400 mt-1 italic">
+              Paiement sécurisé — seule la date d'expiration est requise.
+            </p>
+          </div>
+        </div>
+
+        {/* ADRESSE DE LIVRAISON */}
+        <div className="border-t-2 border-gray-100 pt-8 mt-8 text-left">
+          <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-4">
+            Adresse de livraison
+          </p>
+          <div className="space-y-4">
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+                Rue / Adresse
+              </label>
+              <input
+                type="text"
+                placeholder="12 rue des Lilas"
+                value={delivery.address}
+                onChange={(e) => {
+                  setDelivery({ ...delivery, address: e.target.value });
+                  if (cardErrors.address) setCardErrors((prev) => ({ ...prev, address: "" }));
+                }}
+                className={`w-full border-2 px-4 py-3 text-sm outline-none transition-colors ${
+                  cardErrors.address ? "border-red-500 bg-red-50" : "border-black focus:bg-gray-100"
+                }`}
+              />
+              {cardErrors.address && (
+                <p className="text-red-500 text-[10px] font-bold mt-1">{cardErrors.address}</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+                  Code postal
+                </label>
+                <input
+                  type="text"
+                  placeholder="75001"
+                  value={delivery.zip}
+                  onChange={(e) => {
+                    setDelivery({ ...delivery, zip: e.target.value });
+                    if (cardErrors.zip) setCardErrors((prev) => ({ ...prev, zip: "" }));
+                  }}
+                  className={`w-full border-2 px-4 py-3 text-sm outline-none transition-colors ${
+                    cardErrors.zip ? "border-red-500 bg-red-50" : "border-black focus:bg-gray-100"
+                  }`}
+                />
+                {cardErrors.zip && (
+                  <p className="text-red-500 text-[10px] font-bold mt-1">{cardErrors.zip}</p>
+                )}
+              </div>
+              <div>
+                <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+                  Ville
+                </label>
+                <input
+                  type="text"
+                  placeholder="Paris"
+                  value={delivery.city}
+                  onChange={(e) => {
+                    setDelivery({ ...delivery, city: e.target.value });
+                    if (cardErrors.city) setCardErrors((prev) => ({ ...prev, city: "" }));
+                  }}
+                  className={`w-full border-2 px-4 py-3 text-sm outline-none transition-colors ${
+                    cardErrors.city ? "border-red-500 bg-red-50" : "border-black focus:bg-gray-100"
+                  }`}
+                />
+                {cardErrors.city && (
+                  <p className="text-red-500 text-[10px] font-bold mt-1">{cardErrors.city}</p>
+                )}
+              </div>
+            </div>
+            <div>
+              <label className="block text-[10px] font-bold uppercase tracking-widest text-gray-500 mb-1">
+                Pays
+              </label>
+              <input
+                type="text"
+                placeholder="France"
+                value={delivery.country}
+                onChange={(e) => setDelivery({ ...delivery, country: e.target.value })}
+                className="w-full border-2 border-black px-4 py-3 text-sm outline-none focus:bg-gray-100 transition-colors"
+              />
+            </div>
+          </div>
+        </div>
+
         <button 
           onClick={handleConfirmPayment}
           disabled={loading}
-          className={`w-full py-6 bg-black text-white font-black uppercase text-xs tracking-[0.3em] transition-all ${
+          className={`w-full py-6 mt-8 bg-black text-white font-black uppercase text-xs tracking-[0.3em] transition-all ${
             loading ? "opacity-50 cursor-not-allowed" : "hover:bg-green-600 shadow-[6px_6px_0px_0px_rgba(0,0,0,0.2)]"
           }`}
         >
