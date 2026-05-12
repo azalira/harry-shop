@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { cancelOrder as cancelOrderApi } from "../services/api";
 import StorageImage from "../components/StorageImage";
+import { toast } from "sonner";
+import { TableSkeleton } from "../components/Skeletons";
 
 export default function MyOrders() {
   const [orders, setOrders] = useState([]);
@@ -14,37 +17,15 @@ export default function MyOrders() {
 
   async function cancelOrder(orderId, productId, quantity) {
     if (!confirm("Voulez-vous vraiment annuler cette commande ?")) return;
-
     try {
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .select("stock")
-        .eq("id", productId)
-        .single();
-
-      if (productError) throw productError;
-
-      const { error: updateError } = await supabase
-        .from("orders")
-        .update({ status: "annulé" })
-        .eq("id", orderId);
-
-      if (updateError) throw updateError;
-
-      const { error: stockError } = await supabase
-        .from("products")
-        .update({ stock: product.stock + quantity })
-        .eq("id", productId);
-
-      if (stockError) throw stockError;
-
+      await cancelOrderApi(orderId, productId, quantity);
       setOrders((prev) =>
         prev.map((o) =>
           o.id === orderId ? { ...o, status: "annulé" } : o
         )
       );
     } catch (err) {
-      alert("Erreur lors de l'annulation : " + err.message);
+      toast.error("Erreur lors de l'annulation : " + err.message);
     }
   }
 
@@ -78,11 +59,22 @@ export default function MyOrders() {
     }
   }
 
-  const totalDepense = orders.reduce((acc, order) => acc + (order.total_price || 0), 0);
+  const commandesActives = orders.filter(order => order.status !== "annulé");
+  const totalDepense = commandesActives.reduce((acc, order) => acc + (order.total_price || 0), 0);
 
   if (loading) return (
-    <div className="flex justify-center items-center h-screen font-black uppercase tracking-[0.2em]">
-      Chargement de votre historique...
+    <div className="max-w-[1000px] mx-auto px-6 py-16">
+      <div className="mb-12 border-b pb-8 flex items-end justify-between">
+        <div>
+          <div className="h-8 w-48 bg-gray-100 mb-2" />
+          <div className="h-4 w-36 bg-gray-50" />
+        </div>
+        <div className="text-right">
+          <div className="h-4 w-24 bg-gray-50 mb-1" />
+          <div className="h-8 w-32 bg-gray-100" />
+        </div>
+      </div>
+      <TableSkeleton rows={4} />
     </div>
   );
 

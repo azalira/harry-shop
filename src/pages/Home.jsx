@@ -18,8 +18,7 @@ export default function Home() {
       } catch (error) {
         console.error("Erreur chargement:", error);
       } finally {
-        // Petit délai pour l'effet visuel du skeleton
-        setTimeout(() => setLoading(false), 800);
+        setLoading(false);
       }
     }
     loadHomeProducts();
@@ -27,7 +26,7 @@ export default function Home() {
 
   // --- COMPOSANT SQUELETTE POUR LA GRILLE ---
   const HomeProductSkeleton = () => (
-    <div className="flex flex-col w-full bg-white border border-gray-100 rounded-sm p-4 relative overflow-hidden">
+    <div         className="flex flex-col w-full bg-white border border-gray-100 rounded-xl p-4 relative overflow-hidden">
       {/* Effet Shimmer (Balayage) */}
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent animate-shimmer -translate-x-full"></div>
       

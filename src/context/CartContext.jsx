@@ -5,8 +5,17 @@ const CartContext = createContext();
 
 export const CartProvider = ({ children }) => {
   const [cart, setCart] = useState(() => {
-    const savedCart = localStorage.getItem("cart");
-    return savedCart ? JSON.parse(savedCart) : [];
+    try {
+      const savedCart = localStorage.getItem("cart");
+      if (savedCart) {
+        const parsed = JSON.parse(savedCart);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+    } catch (e) {
+      console.error("Erreur lecture localStorage cart:", e);
+      localStorage.removeItem("cart");
+    }
+    return [];
   });
 
   const [userId, setUserId] = useState(null);
@@ -56,7 +65,7 @@ export const CartProvider = ({ children }) => {
   };
 
   const removeFromCart = (id) => {
-    setCart(cart.filter((item) => item.id !== id));
+    setCart((prev) => prev.filter((item) => item.id !== id && (!userId || item.userId === userId)));
   };
 
   const clearCart = () => {
@@ -72,7 +81,7 @@ export const CartProvider = ({ children }) => {
   const userCart = userId ? cart.filter((item) => item.userId === userId) : cart;
 
   const totalPrice = userCart.reduce(
-    (acc, item) => acc + item.price * item.quantity,
+    (acc, item) => acc + (Number(item.price) || 0) * (Number(item.quantity) || 0),
     0
   );
 

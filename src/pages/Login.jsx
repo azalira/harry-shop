@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { useNavigate, Link } from 'react-router-dom';
+import { toast } from 'sonner';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -18,10 +19,10 @@ export default function Login() {
     });
 
     if (error) {
-      alert("Erreur : " + error.message);
+      toast.error("Erreur : " + error.message);
     } else {
-      alert("Connexion réussie !");
-      navigate('/'); // Redirige vers l'accueil
+      toast.success("Connexion réussie !");
+      navigate('/');
     }
     setLoading(false);
   };

@@ -20,13 +20,24 @@ export default function Navbar() {
   const totalItems = cart.reduce((acc, item) => acc + item.quantity, 0);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    let channel;
+
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
       if (session) {
-        fetchUserData(session.user.id);
-        fetchUnreadCount(session.user.id);
+        await Promise.all([fetchUserData(session.user.id), fetchUnreadCount(session.user.id)]);
+        channel = supabase
+          .channel('realtime_notifications')
+          .on('postgres_changes', 
+            { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, 
+            () => fetchUnreadCount(session.user.id)
+          )
+          .subscribe();
       }
-    });
+    };
+
+    init();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session);
@@ -40,22 +51,11 @@ export default function Navbar() {
       }
     });
 
-    let channel;
-    if (session) {
-      channel = supabase
-        .channel('realtime_notifications')
-        .on('postgres_changes', 
-          { event: '*', schema: 'public', table: 'notifications', filter: `user_id=eq.${session.user.id}` }, 
-          () => fetchUnreadCount(session.user.id)
-        )
-        .subscribe();
-    }
-
     return () => {
       subscription.unsubscribe();
       if (channel) supabase.removeChannel(channel);
     };
-  }, [session?.user?.id]);
+  }, []);
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -115,20 +115,28 @@ export default function Navbar() {
   };
 
   async function fetchUserData(userId) {
-    const { data } = await supabase.from('profiles').select('role, username').eq('id', userId).single();
-    if (data) {
-      setRole(data.role);
-      setUsername(data.username);
+    try {
+      const { data } = await supabase.from('profiles').select('role, username').eq('id', userId).single();
+      if (data) {
+        setRole(data.role);
+        setUsername(data.username);
+      }
+    } catch (err) {
+      console.error("Erreur chargement profil:", err);
     }
   }
 
   async function fetchUnreadCount(userId) {
-    const { count } = await supabase
-      .from('notifications')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId)
-      .eq('is_read', false);
-    setUnreadCount(count || 0);
+    try {
+      const { count } = await supabase
+        .from('notifications')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId)
+        .eq('is_read', false);
+      setUnreadCount(count || 0);
+    } catch (err) {
+      console.error("Erreur chargement notifications:", err);
+    }
   }
 
   const handleLogout = async () => {

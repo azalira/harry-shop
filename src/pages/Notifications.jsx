@@ -1,18 +1,23 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase } from "../services/supabaseClient";
+import { toast } from "sonner";
+import { TextSkeleton } from "../components/Skeletons";
 
 export default function Notifications() {
   const [notifications, setNotifications] = useState([]);
   const [loading, setLoading] = useState(true);
+  const channelRef = useRef(null);
 
   useEffect(() => {
-    // 1. Chargement initial
+    let cancelled = false;
     fetchNotifications();
 
-    // 2. ÉCOUTE EN TEMPS RÉEL (Supabase Realtime)
     const setupSubscription = async () => {
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
+      if (!user || cancelled) return;
+
+      const existing = supabase.getChannels().find(c => c.topic === `notifications-${user.id}`);
+      if (existing) supabase.removeChannel(existing);
 
       const channel = supabase
         .channel(`notifications-${user.id}`)
@@ -25,22 +30,22 @@ export default function Notifications() {
             filter: `user_id=eq.${user.id}` 
           }, 
           (payload) => {
-            // On ajoute la nouvelle notification en haut de la liste
             setNotifications(prev => [payload.new, ...prev]);
           }
         )
         .subscribe();
 
-      return channel;
+      if (!cancelled) channelRef.current = channel;
     };
 
-    const channelRef = setupSubscription();
+    setupSubscription();
 
-    // Nettoyage de l'écouteur quand on quitte la page
     return () => {
-      channelRef.then(channel => {
-        if (channel) supabase.removeChannel(channel);
-      });
+      cancelled = true;
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current);
+        channelRef.current = null;
+      }
     };
   }, []);
 
@@ -81,19 +86,37 @@ export default function Notifications() {
 
   async function deleteAll() {
     if (!window.confirm("Tout effacer ?")) return;
-    
-    const { data: { user } } = await supabase.auth.getUser();
-    const { error } = await supabase
-      .from("notifications")
-      .delete()
-      .eq("user_id", user.id);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error } = await supabase
+        .from("notifications")
+        .delete()
+        .eq("user_id", user.id);
 
-    if (!error) setNotifications([]);
+      if (error) throw error;
+      setNotifications([]);
+    } catch (err) {
+      console.error("Erreur suppression notifications:", err);
+      toast.error("Erreur lors de la suppression : " + err.message);
+    }
   }
 
   if (loading) return (
-    <div className="flex justify-center items-center h-[60vh] font-black uppercase italic tracking-widest animate-pulse">
-      Initialisation du flux...
+    <div className="max-w-[800px] mx-auto px-6 py-16">
+      <div className="mb-12 border-b-4 border-black pb-6">
+        <div className="h-12 w-64 bg-gray-100 mb-2" />
+      </div>
+      <div className="space-y-8">
+        {[1, 2, 3].map((i) => (
+          <div key={i} className="p-8 border-2 border-gray-200 bg-gray-50 rounded-xl">
+            <div className="flex items-center gap-3 mb-3">
+              <div className="h-5 w-16 bg-gray-200" />
+              <div className="h-4 w-32 bg-gray-100" />
+            </div>
+            <TextSkeleton lines={2} />
+          </div>
+        ))}
+      </div>
     </div>
   );
 
@@ -115,7 +138,7 @@ export default function Notifications() {
 
       <div className="space-y-8">
         {notifications.length === 0 ? (
-          <div className="border-4 border-dashed border-gray-100 py-32 text-center">
+            <div className="border-4 border-dashed border-gray-100 py-32 text-center rounded-xl">
             <p className="text-gray-300 font-black uppercase text-sm italic tracking-widest">
               Silence radio.
             </p>
@@ -124,7 +147,7 @@ export default function Notifications() {
           notifications.map((n) => (
             <div 
               key={n.id} 
-              className={`relative p-8 transition-all duration-300 border-2 ${
+              className={`relative p-8 transition-all duration-300 border-2 rounded-xl ${
                 n.is_read 
                 ? 'border-gray-200 bg-gray-50 opacity-50 grayscale' 
                 : 'border-black bg-white shadow-[10px_10px_0px_0px_rgba(0,0,0,1)] hover:-translate-x-1 hover:-translate-y-1 hover:shadow-[14px_14px_0px_0px_rgba(255,100,0,1)]'
@@ -140,7 +163,7 @@ export default function Notifications() {
                 <div className="flex-1">
                   <div className="flex items-center gap-3 mb-3">
                     <span className="text-[10px] font-black uppercase px-2 py-0.5 bg-black text-white">
-                      {n.type || 'Système'}
+                      {n.type || 'Système'}
                     </span>
                     <span className="text-[10px] font-bold text-gray-400 uppercase tracking-tighter italic">
                       {new Date(n.created_at).toLocaleTimeString()} — {new Date(n.created_at).toLocaleDateString()}

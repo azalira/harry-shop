@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { Link } from 'react-router-dom';
 import StorageImage from '../components/StorageImage';
+import { toast } from 'sonner';
 
 export default function SellerDashboard() {
   const [products, setProducts] = useState([]);
@@ -14,7 +15,7 @@ export default function SellerDashboard() {
       // Récupérer l'ID de l'utilisateur connecté
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
-        alert("Veuillez vous connecter");
+        toast.error("Veuillez vous connecter");
         return;
       }
 
@@ -29,7 +30,7 @@ export default function SellerDashboard() {
       setProducts(data || []);
     } catch (error) {
       console.error("Erreur fetch:", error.message);
-      alert("Impossible de charger les produits");
+      toast.error("Impossible de charger les produits");
     } finally {
       setLoading(false);
     }
@@ -51,30 +52,31 @@ export default function SellerDashboard() {
       .limit(1);
 
     if (orderError) {
-      alert("Erreur de vérification des commandes : " + orderError.message);
+      toast.error("Erreur de vérification des commandes : " + orderError.message);
       return;
     }
 
     if (orderData?.length > 0) {
-      alert("Impossible de supprimer ce produit : il est déjà associé à une commande.");
+      toast.error("Impossible de supprimer ce produit : il est déjà associé à une commande.");
       return;
     }
 
+    const { data: { user } } = await supabase.auth.getUser();
     const { error } = await supabase
       .from("products")
       .delete()
-      .eq("id", productId);
+      .eq("id", productId)
+      .eq("seller_id", user.id);
 
     if (error) {
-      alert("Erreur lors de la suppression : " + error.message);
+      toast.error("Erreur lors de la suppression : " + error.message);
     } else {
-      // Mise à jour locale sans rechargement
       setProducts(products.filter((p) => p.id !== productId));
     }
   };
 
   const SkeletonCard = () => (
-    <div className="relative overflow-hidden flex items-center justify-between p-6 border border-gray-100 bg-white">
+    <div className="relative overflow-hidden flex items-center justify-between p-6 border border-gray-100 bg-white rounded-xl">
       <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/60 to-transparent animate-shimmer -translate-x-full"></div>
       <div className="flex items-center gap-6">
         <div className="w-20 h-20 bg-gray-100"></div>
@@ -100,7 +102,7 @@ export default function SellerDashboard() {
           <><SkeletonCard /><SkeletonCard /><SkeletonCard /></>
         ) : products.length > 0 ? (
           products.map((product) => (
-            <div key={product.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:shadow-md transition-all">
+            <div key={product.id} className="flex items-center justify-between p-6 border border-gray-100 bg-white hover:shadow-md transition-all rounded-xl">
               <div className="flex items-center gap-6">
                 <StorageImage
                   src={product.image_url}
@@ -130,7 +132,7 @@ export default function SellerDashboard() {
             </div>
           ))
         ) : (
-          <div className="text-center py-20 border-2 border-dashed border-gray-100 text-gray-400 uppercase text-xs font-bold tracking-widest">
+          <div className="text-center py-20 border-2 border-dashed border-gray-100 text-gray-400 uppercase text-xs font-bold tracking-widest rounded-xl">
             Aucun produit trouvé
           </div>
         )}

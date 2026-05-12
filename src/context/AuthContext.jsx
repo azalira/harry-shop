@@ -9,32 +9,45 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Vérifier la session actuelle
-    const setData = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        const { data } = await supabase
-          .from('profiles')
-          .select('role')
-          .eq('id', session.user.id)
-          .single();
-        setRole(data?.role);
+    const init = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        setUser(session?.user ?? null);
+
+        if (session?.user) {
+          const { data } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', session.user.id)
+            .single();
+          setRole(data?.role);
+        }
+      } catch (err) {
+        console.error("Erreur init AuthContext:", err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    setData();
+    init();
 
-    // Écouter les changements de connexion (login/logout)
     const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-      setData();
     });
 
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!user) { setRole(null); return; }
+    supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+      .then(({ data }) => data && setRole(data.role))
+      .catch(() => {});
+  }, [user]);
 
   return (
     <AuthContext.Provider value={{ user, role, loading }}>

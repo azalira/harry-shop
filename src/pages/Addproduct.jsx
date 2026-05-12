@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase, STORAGE_BUCKET } from "../services/supabaseClient";
 import { useNavigate } from "react-router-dom";
+import { toast } from "sonner";
 
 export default function AddProduct() {
   const [form, setForm] = useState({
@@ -11,6 +12,16 @@ export default function AddProduct() {
     category: "",
     image_url: ""
   });
+  const previewUrlRef = useRef(null);
+
+  useEffect(() => {
+    return () => {
+      if (previewUrlRef.current) {
+        URL.revokeObjectURL(previewUrlRef.current);
+      }
+    };
+  }, []);
+
   const [selectedFile, setSelectedFile] = useState(null);
   const [uploading, setUploading] = useState(false);
   const navigate = useNavigate();
@@ -30,7 +41,7 @@ export default function AddProduct() {
 
     if (error) {
       console.error(`Erreur upload bucket=${STORAGE_BUCKET}:`, error);
-      alert(`Erreur lors de l'upload de l'image vers le bucket "${STORAGE_BUCKET}" : ${error.message || JSON.stringify(error)}`);
+      toast.error(`Erreur upload : ${error.message || JSON.stringify(error)}`);
       setUploading(false);
       return null;
     }
@@ -44,14 +55,16 @@ export default function AddProduct() {
     if (file) {
       // Vérifier le type de fichier
       if (!file.type.startsWith('image/')) {
-        alert('Veuillez sélectionner une image valide');
+        toast.error('Veuillez sélectionner une image valide');
         return;
       }
       // Vérifier la taille (max 5MB)
       if (file.size > 5 * 1024 * 1024) {
-        alert('L\'image ne doit pas dépasser 5MB');
+        toast.error('L\'image ne doit pas dépasser 5MB');
         return;
       }
+      if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = URL.createObjectURL(file);
       setSelectedFile(file);
     }
   };
@@ -59,8 +72,12 @@ export default function AddProduct() {
   const handleSubmit = async (e) => {
     e.preventDefault();
 
+    if (isNaN(parseFloat(form.price)) || isNaN(parseInt(form.stock))) {
+      toast.error("Le prix et le stock doivent être des nombres valides.");
+      return;
+    }
     if (parseFloat(form.price) < 0 || parseInt(form.stock) < 0) {
-      alert("Erreur : Le prix et le stock doivent être positifs.");
+      toast.error("Le prix et le stock doivent être positifs.");
       return;
     }
 
@@ -87,15 +104,15 @@ export default function AddProduct() {
       ]);
 
     if (!error) {
-      alert("Produit ajouté avec succès !");
+      toast.success("Produit ajouté avec succès !");
       navigate("/dashboard");
     } else {
-      alert("Erreur : " + error.message);
+      toast.error("Erreur : " + error.message);
     }
   };
 
   return (
-    <div className="max-w-[600px] mx-auto mt-20 p-10 bg-white border border-gray-100 shadow-sm">
+    <div className="max-w-[600px] mx-auto mt-20 p-10 bg-white border border-gray-100 shadow-sm rounded-xl">
       <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Ajouter un produit</h2>
       
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -124,9 +141,9 @@ export default function AddProduct() {
               <div className="mt-3">
                 <p className="text-xs text-gray-600 mb-2">Aperçu :</p>
                 <img
-                  src={URL.createObjectURL(selectedFile)}
+                  src={previewUrlRef.current}
                   alt="Aperçu"
-                  className="w-32 h-32 object-cover border border-gray-200 rounded"
+                  className="w-32 h-32 object-cover border border-gray-200 rounded-lg"
                 />
               </div>
             )}

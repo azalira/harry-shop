@@ -100,3 +100,31 @@ export const signUpUser = async (email, password, role, username) => {
     throw error;
   }
 };
+
+// ============================================================
+// 3. ANNULATION DE COMMANDE (partagé MyOrders + SellerOrders)
+// ============================================================
+
+export async function cancelOrder(orderId, productId, quantity) {
+  const { data: product, error: productError } = await supabase
+    .from("products")
+    .select("stock")
+    .eq("id", productId)
+    .single();
+
+  if (productError) throw productError;
+
+  const { error: updateError } = await supabase
+    .from("orders")
+    .update({ status: "annulé" })
+    .eq("id", orderId);
+
+  if (updateError) throw updateError;
+
+  const { error: stockError } = await supabase
+    .from("products")
+    .update({ stock: product.stock + quantity })
+    .eq("id", productId);
+
+  if (stockError) throw stockError;
+}

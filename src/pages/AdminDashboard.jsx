@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { supabase } from "../services/supabaseClient";
+import { toast } from "sonner";
 
 export default function AdminDashboard() {
   const [products, setProducts] = useState([]);
@@ -27,20 +28,29 @@ export default function AdminDashboard() {
   async function fetchDashboardData() {
     setLoading(true);
     try {
-      const [prodRes, profRes] = await Promise.all([
+      const [prodRes, profRes, ordersRes] = await Promise.all([
         supabase.from("products").select("*, profiles(username)"),
-        supabase.from("profiles").select("role")
+        supabase.from("profiles").select("role"),
+        supabase.from("orders").select("total_price, product_id, products(name)")
       ]);
 
       if (prodRes.error) throw prodRes.error;
 
       const productsData = prodRes.data || [];
       const profiles = profRes.data || [];
+      const ordersData = ordersRes.data || [];
 
-      const revenue = productsData.reduce((acc, curr) => acc + (Number(curr.price) || 0), 0);
+      const revenue = ordersData.reduce((acc, curr) => acc + (Number(curr.total_price) || 0), 0);
       
       const sellers = profiles.filter(p => ['seller', 'vendeur'].includes(p.role?.toLowerCase()));
       const buyers = profiles.filter(p => ['buyer', 'client', 'customer'].includes(p.role?.toLowerCase()));
+
+      const productSales = {};
+      ordersData.forEach(o => {
+        const name = o.products?.name || "Inconnu";
+        productSales[name] = (productSales[name] || 0) + 1;
+      });
+      const mostSold = Object.entries(productSales).sort((a, b) => b[1] - a[1])[0]?.[0] || "Aucun";
 
       setProducts(productsData);
       setFilteredProducts(productsData);
@@ -49,7 +59,7 @@ export default function AdminDashboard() {
         totalSellers: sellers.length,
         totalBuyers: buyers.length,
         totalRevenue: revenue.toLocaleString('fr-FR', { minimumFractionDigits: 2 }),
-        mostSoldProduct: productsData[0]?.name || "Aucun"
+        mostSoldProduct: mostSold
       });
 
     } catch (error) {
@@ -66,14 +76,14 @@ export default function AdminDashboard() {
     try {
       const { data: orders } = await supabase.from("orders").select("id").eq("product_id", id);
       if (orders && orders.length > 0) {
-        alert("❌ Impossible : Ce produit est lié à des commandes.");
+        toast.error("Impossible : Ce produit est lié à des commandes.");
         return;
       }
       const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
       setProducts(prev => prev.filter(p => p.id !== id));
     } catch (error) {
-      alert("Erreur : " + error.message);
+      toast.error("Erreur : " + error.message);
     }
   }
 
@@ -108,29 +118,29 @@ export default function AdminDashboard() {
 
       {/* STATS GRID RESPONSIVE */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
-        <div className="bg-black text-white p-6 shadow-xl">
+        <div className="bg-black text-white p-6 shadow-xl rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-widest mb-1 opacity-50">Revenue Brut</p>
           <p className="text-2xl md:text-3xl font-black italic">{stats.totalRevenue} €</p>
         </div>
         
-        <div className="bg-white border-4 border-black p-6">
+        <div className="bg-white border-4 border-black p-6 rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-widest mb-1 text-gray-400">Users (V/C)</p>
           <p className="text-2xl md:text-3xl font-black">{stats.totalSellers} / {stats.totalBuyers}</p>
         </div>
 
-        <div className="bg-white border-4 border-black p-6">
+        <div className="bg-white border-4 border-black p-6 rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-widest mb-1 text-gray-400">Articles</p>
           <p className="text-2xl md:text-3xl font-black">{products.length}</p>
         </div>
 
-        <div className="bg-red-600 text-white p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)]">
+        <div className="bg-red-600 text-white p-6 shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] rounded-xl">
           <p className="text-[10px] uppercase font-bold tracking-widest mb-1 opacity-80">Stock Alerte</p>
           <p className="text-2xl md:text-3xl font-black">{products.filter(p => (p.stock || 0) <= 0).length}</p>
         </div>
       </div>
 
       {/* TABLEAU AVEC OVERFLOW POUR MOBILE */}
-      <div className="w-full overflow-x-auto border-4 border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)]">
+      <div className="w-full overflow-x-auto border-4 border-black bg-white shadow-[8px_8px_0px_0px_rgba(0,0,0,0.05)] rounded-xl">
         <table className="w-full text-left border-collapse min-w-[700px]">
           <thead>
             <tr className="bg-black text-white text-[10px] uppercase tracking-widest">

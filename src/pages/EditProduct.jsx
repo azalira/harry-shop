@@ -2,6 +2,8 @@ import { useEffect, useState } from "react";
 import { supabase, STORAGE_BUCKET } from "../services/supabaseClient";
 import { useNavigate, useParams } from "react-router-dom";
 import useStorageImageUrl from "../hooks/useStorageImageUrl";
+import { toast } from "sonner";
+import { TextSkeleton } from "../components/Skeletons";
 
 export default function EditProduct() {
   const { id } = useParams();
@@ -72,7 +74,7 @@ export default function EditProduct() {
       return filePath;
 
     } catch (error) {
-      alert("Erreur upload: " + error.message);
+      toast.error("Erreur upload: " + error.message);
       return null;
     } finally {
       setUploading(false);
@@ -83,7 +85,7 @@ export default function EditProduct() {
     const file = e.target.files[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        alert("Image trop lourde (max 5Mo)");
+        toast.error("Image trop lourde (max 5Mo)");
         return;
       }
       setSelectedFile(file);
@@ -95,15 +97,34 @@ export default function EditProduct() {
     e.preventDefault();
     setSaving(true);
 
+    if (isNaN(parseFloat(form.price)) || isNaN(parseInt(form.stock))) {
+      toast.error("Le prix et le stock doivent être des nombres valides.");
+      setSaving(false);
+      return;
+    }
+    if (parseFloat(form.price) < 0 || parseInt(form.stock) < 0) {
+      toast.error("Le prix et le stock doivent être positifs.");
+      setSaving(false);
+      return;
+    }
+
     let finalImageUrl = currentImageValue;
 
-    // Si l'utilisateur a choisi un nouveau fichier
     if (selectedFile) {
       const uploadedUrl = await uploadImage(selectedFile);
       if (uploadedUrl) finalImageUrl = uploadedUrl;
     }
 
-    const { error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast.error("Veuillez vous reconnecter.");
+      setSaving(false);
+      return;
+    }
+
+    console.log("Updating product:", { id, form, finalImageUrl });
+
+    const { data, error } = await supabase
       .from("products")
       .update({
         name: form.name,
@@ -113,21 +134,45 @@ export default function EditProduct() {
         category: form.category,
         image_url: finalImageUrl,
       })
-      .eq("id", id);
+      .eq("id", id)
+      .select();
 
-    if (!error) {
-      alert("Produit mis à jour avec succès !");
-      navigate("/dashboard");
-    } else {
-      alert("Erreur update: " + error.message);
+    if (error) {
+      console.error("Erreur update:", error);
+      toast.error("Erreur update: " + error.message);
       setSaving(false);
+    } else if (!data || data.length === 0) {
+      console.error("Aucune ligne mise à jour - id invalide ?", { id });
+      toast.error("Produit introuvable (id invalide).");
+      setSaving(false);
+    } else {
+      console.log("Update success:", data);
+      toast.success("Produit mis à jour avec succès !");
+      navigate("/dashboard");
     }
   };
 
-  if (loading) return <div className="flex justify-center items-center h-screen font-black uppercase tracking-widest">Chargement...</div>;
+  if (loading) return (
+    <div className="max-w-[600px] mx-auto mt-20 p-10">
+      <div className="h-8 w-64 bg-gray-100 mb-8" />
+      <div className="space-y-6">
+        <TextSkeleton lines={1} />
+        <div className="flex gap-6 items-center p-4 bg-gray-50">
+          <div className="w-24 h-24 bg-gray-200 flex-shrink-0" />
+          <div className="flex-1"><TextSkeleton lines={1} /></div>
+        </div>
+        <div className="grid grid-cols-2 gap-8">
+          <TextSkeleton lines={1} />
+          <TextSkeleton lines={1} />
+        </div>
+        <TextSkeleton lines={1} />
+        <TextSkeleton lines={3} />
+      </div>
+    </div>
+  );
 
   return (
-    <div className="max-w-[600px] mx-auto mt-20 p-10 bg-white border border-gray-100 shadow-sm">
+    <div className="max-w-[600px] mx-auto mt-20 p-10 bg-white border border-gray-100 shadow-sm rounded-xl">
       <h2 className="text-2xl font-black uppercase tracking-tighter mb-8 border-b pb-4">Modifier le produit</h2>
 
       <form onSubmit={handleSubmit} className="space-y-6">
@@ -144,7 +189,7 @@ export default function EditProduct() {
         </div>
 
         {/* SECTION IMAGE */}
-        <div className="flex gap-6 items-center p-4 bg-gray-50 border border-dashed border-gray-200">
+        <div className="flex gap-6 items-center p-4 bg-gray-50 border border-dashed border-gray-200 rounded-lg">
           <div className="w-24 h-24 bg-white border border-gray-100 flex-shrink-0">
             <img 
               src={previewUrl || currentImageUrl || 'https://via.placeholder.com/150'} 

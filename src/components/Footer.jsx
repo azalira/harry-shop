@@ -5,9 +5,9 @@ export default function Footer() {
         <p className="text-sm font-bold tracking-widest mb-4">LOGO</p>
         <p className="text-xs text-gray-400">© 2026 E-shop Inc. Tous droits réservés.</p>
         <div className="flex gap-6 mt-6 text-xs font-semibold text-gray-500">
-          <a href="#">INSTAGRAM</a>
-          <a href="#">FACEBOOK</a>
-          <a href="#">TWITTER</a>
+          <span className="opacity-30">INSTAGRAM</span>
+          <span className="opacity-30">FACEBOOK</span>
+          <span className="opacity-30">TWITTER</span>
         </div>
       </div>
     </footer>

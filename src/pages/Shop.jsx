@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import ProductCard from "../components/ProductCard";
@@ -10,23 +10,29 @@ export default function Shop() {
   const searchQuery = searchParams.get("search")?.toLowerCase() || "";
 
   useEffect(() => {
+    async function fetchProducts() {
+      try {
+        const { data, error } = await supabase
+          .from("products")
+          .select(`*, profiles (username)`);
+        if (error) throw error;
+        setProducts(data);
+      } catch (error) {
+        console.error("Erreur:", error.message);
+      } finally {
+        setLoading(false);
+      }
+    }
     fetchProducts();
   }, []);
 
-  async function fetchProducts() {
-    try {
-      const { data, error } = await supabase
-        .from("products")
-        .select(`*, profiles (username)`);
-      if (error) throw error;
-      setProducts(data);
-    } catch (error) {
-      console.error("Erreur:", error.message);
-    } finally {
-      // Un léger délai pour laisser le temps au squelette de s'afficher
-      setTimeout(() => setLoading(false), 600);
-    }
-  }
+  const filteredProducts = useMemo(() =>
+    products.filter((product) => {
+      const normalized = `${product.name || ""} ${product.category || ""} ${product.description || ""}`.toLowerCase();
+      return normalized.includes(searchQuery);
+    }),
+    [products, searchQuery]
+  );
 
   // Ce composant interne gère l'affichage pendant le chargement
   const ShopSkeleton = () => (
@@ -70,27 +76,18 @@ export default function Shop() {
             <ShopSkeleton /> <ShopSkeleton /> <ShopSkeleton />
             <ShopSkeleton /> <ShopSkeleton /> <ShopSkeleton />
           </>
-        ) : (() => {
-          const filteredProducts = products.filter((product) => {
-            const normalized = `${product.name || ""} ${product.category || ""} ${product.description || ""}`.toLowerCase();
-            return normalized.includes(searchQuery);
-          });
-
-          if (filteredProducts.length > 0) {
-            return filteredProducts.map((product) => (
-              <ProductCard key={product.id} product={product} />
-            ));
-          }
-
-          return (
-            <div className="col-span-full py-16 text-center border border-dashed border-gray-100">
-              <p className="text-gray-500 font-black uppercase text-[11px] tracking-widest mb-3">Aucun produit trouvé.</p>
-              {searchQuery && (
-                <p className="text-[10px] text-gray-400 uppercase tracking-[0.35em]">Essayez une autre recherche.</p>
-              )}
-            </div>
-          );
-        })()}
+        ) : filteredProducts.length > 0 ? (
+          filteredProducts.map((product) => (
+            <ProductCard key={product.id} product={product} />
+          ))
+        ) : (
+          <div className="col-span-full py-16 text-center border border-dashed border-gray-100 rounded-xl">
+            <p className="text-gray-500 font-black uppercase text-[11px] tracking-widest mb-3">Aucun produit trouvé.</p>
+            {searchQuery && (
+              <p className="text-[10px] text-gray-400 uppercase tracking-[0.35em]">Essayez une autre recherche.</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

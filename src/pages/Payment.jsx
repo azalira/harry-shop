@@ -3,6 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCart } from "../context/CartContext";
 import { supabase } from "../services/supabaseClient";
 import StorageImage from "../components/StorageImage";
+import { toast } from "sonner";
 
 export default function Payment() {
   const location = useLocation();
@@ -71,39 +72,75 @@ export default function Payment() {
       const deliveryInfo = `${delivery.address}, ${delivery.zip} ${delivery.city}, ${delivery.country}`;
 
       if (orderId) {
-        const { error } = await supabase
+        const { data: order, error: orderError } = await supabase
           .from("orders")
           .update({
             status: "payé",
             card_last_four: lastFour,
             delivery_address: deliveryInfo
           })
-          .eq("id", orderId);
+          .eq("id", orderId)
+          .select("product_id, quantity")
+          .single();
 
-        if (error) throw error;
+        if (orderError) throw orderError;
+
+        const { data: product } = await supabase
+          .from("products")
+          .select("stock")
+          .eq("id", order.product_id)
+          .single();
+
+        if (product) {
+          await supabase
+            .from("products")
+            .update({ stock: product.stock - order.quantity })
+            .eq("id", order.product_id);
+        }
       } else if (Array.isArray(cartItems) && cartItems.length > 0) {
-        const ordersToInsert = cartItems.map((item) => ({
-          buyer_id: user.id,
-          product_id: item.id,
-          seller_id: item.seller_id || item.user_id || item.profiles?.id || null,
-          quantity: item.quantity,
-          total_price: Number(item.price) * Number(item.quantity),
-          status: "payé",
-          card_last_four: lastFour,
-          delivery_address: deliveryInfo
-        }));
+        const ordersToInsert = cartItems.map((item) => {
+          if (!item.seller_id && !item.user_id) {
+            throw new Error(`seller_id manquant pour le produit "${item.name}"`);
+          }
+          return {
+            buyer_id: user.id,
+            product_id: item.id,
+            seller_id: item.seller_id || item.user_id || item.profiles?.id,
+            quantity: item.quantity,
+            total_price: Number(item.price) * Number(item.quantity),
+            status: "payé",
+            card_last_four: lastFour,
+            delivery_address: deliveryInfo
+          };
+        });
 
         const { error } = await supabase.from("orders").insert(ordersToInsert);
         if (error) throw error;
+
+        for (const item of cartItems) {
+          const { data: product } = await supabase
+            .from("products")
+            .select("stock")
+            .eq("id", item.id)
+            .single();
+
+          if (product) {
+            await supabase
+              .from("products")
+              .update({ stock: product.stock - item.quantity })
+              .eq("id", item.id);
+          }
+        }
+
         clearCart();
       } else {
         throw new Error("Aucune commande valide à payer.");
       }
 
-      alert("Paiement réussi !");
+      toast.success("Paiement réussi !");
       navigate("/shop");
     } catch (err) {
-      alert("Erreur lors du paiement : " + err.message);
+      toast.error("Erreur lors du paiement : " + err.message);
     } finally {
       setLoading(false);
     }
@@ -131,7 +168,7 @@ export default function Payment() {
     <div className="max-w-[800px] mx-auto p-10 text-center">
       <h1 className="text-5xl font-black uppercase mb-10 italic tracking-tighter">Paiement</h1>
       
-      <div className="border-4 border-black p-10 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white">
+      <div className="border-4 border-black p-10 shadow-[12px_12px_0px_0px_rgba(0,0,0,1)] bg-white rounded-xl">
         <div className="flex justify-between items-start mb-8 border-b-2 border-gray-100 pb-6">
           <div className="text-left">
             <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Commande n°</p>
@@ -163,7 +200,7 @@ export default function Payment() {
             ))}
           </div>
         ) : (
-          <div className="flex gap-6 items-center mb-10 bg-gray-50 p-4">
+          <div className="flex gap-6 items-center mb-10 bg-gray-50 p-4 rounded-lg">
             <StorageImage src={product.image_url} alt={product?.name || "Produit"} className="w-20 h-20 object-cover border-2 border-black" />
             <div className="text-left">
               <p className="font-black uppercase text-sm">{product?.name || "Produit"}</p>

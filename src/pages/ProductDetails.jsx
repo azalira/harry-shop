@@ -3,6 +3,8 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "../services/supabaseClient";
 import { useCart } from "../context/CartContext";
 import StorageImage from "../components/StorageImage";
+import { toast } from "sonner";
+import { TextSkeleton } from "../components/Skeletons";
 
 export default function ProductDetails() {
   const { id } = useParams();
@@ -49,7 +51,7 @@ export default function ProductDetails() {
 
   const handleBuyNow = async () => {
     if (!isInStock) {
-      alert("Ce produit est en rupture de stock.");
+      toast.error("Ce produit est en rupture de stock.");
       return;
     }
 
@@ -60,7 +62,7 @@ export default function ProductDetails() {
     const sellerId = product.user_id || product.seller_id || product.profiles?.id;
 
     if (!sellerId) {
-      alert("Erreur : Impossible d'identifier le vendeur (colonne manquante dans la DB)");
+      toast.error("Erreur : Impossible d'identifier le vendeur (colonne manquante dans la DB)");
       return;
     }
 
@@ -81,6 +83,13 @@ export default function ProductDetails() {
 
       if (error) throw error;
 
+      const { error: stockError } = await supabase
+        .from("products")
+        .update({ stock: product.stock - quantity })
+        .eq("id", product.id);
+
+      if (stockError) console.error("Erreur mise à jour stock:", stockError);
+
       navigate("/payment", {
         state: {
           orderId: newOrder.id,
@@ -89,7 +98,7 @@ export default function ProductDetails() {
         }
       });
     } catch (err) {
-      alert("Erreur commande : " + err.message);
+      toast.error("Erreur commande : " + err.message);
     } finally {
       setIsBuying(false);
     }
@@ -97,18 +106,30 @@ export default function ProductDetails() {
 
   const handleAddToCart = () => {
     if (!isInStock) {
-      alert("Ce produit est en rupture de stock.");
+      toast.error("Ce produit est en rupture de stock.");
       return;
     }
     addToCart(product, quantity);
+    toast.success(`${product.name} ajouté au panier`);
   };
 
   // --- GESTION DES ÉTATS D'AFFICHAGE (EMPECHE LE CRASH) ---
 
   if (loading) {
     return (
-      <div className="max-w-[1100px] mx-auto px-6 py-20 text-center font-black uppercase animate-pulse">
-        Chargement des données...
+      <div className="max-w-[1100px] mx-auto px-6 py-20">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
+          <div className="aspect-square bg-gray-100" />
+          <div className="space-y-8">
+            <TextSkeleton lines={2} />
+            <div className="h-10 w-32 bg-gray-100" />
+            <div className="space-y-4 pt-6">
+              <div className="h-6 w-48 bg-gray-100" />
+              <div className="h-14 bg-gray-100" />
+              <div className="h-14 bg-gray-100" />
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -133,7 +154,7 @@ export default function ProductDetails() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-16 items-start">
         
         {/* IMAGE */}
-        <div className="bg-white aspect-square border border-gray-100 shadow-sm overflow-hidden">
+          <div className="bg-white aspect-square border border-gray-100 shadow-sm overflow-hidden rounded-xl">
           <StorageImage
             src={product.image_url}
             alt={product.name}
