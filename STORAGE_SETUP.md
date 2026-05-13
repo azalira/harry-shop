@@ -2,12 +2,9 @@
 
 ## Prérequis
 
-Assurez-vous d'avoir configuré votre projet Supabase avec les variables d'environnement suivantes dans votre fichier `.env` :
+Assurez-vous d'avoir configuré votre projet Supabase avec la variable d'environnement suivante pour le script de configuration :
 
 ```
-VITE_SUPABASE_URL=votre_supabase_url
-VITE_SUPABASE_ANON_KEY=votre_supabase_anon_key
-VITE_SUPABASE_STORAGE_BUCKET=products
 SUPABASE_SERVICE_ROLE_KEY=votre_service_role_key
 ```
 
